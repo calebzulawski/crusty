@@ -29,6 +29,37 @@ impl std::fmt::Display for Include {
     }
 }
 
+struct Identifier {
+    name: String,
+}
+
+impl Identifier {
+    fn new(name: &str) -> Result<Self, String> {
+        if name.is_empty() {
+            return Err("identifier cannot be empty".to_string());
+        }
+        let first = name.chars().next().unwrap();
+        if !first.is_ascii_alphabetic() && (first != '_') {
+            return Err("identifier must begin with letter or '_'".to_string());
+        }
+        if !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || (c == '_'))
+        {
+            return Err("identifiers can only contain alphanumerics or '_'".to_string());
+        }
+        Ok(Self {
+            name: name.to_string(),
+        })
+    }
+}
+
+impl std::fmt::Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.name)
+    }
+}
+
 enum Literal {
     Signed(i128),
     SignedLong(i128),
@@ -90,7 +121,7 @@ impl std::fmt::Display for FloatConstant {
 }
 
 enum Expression {
-    Identifier(String),
+    Identifier(Identifier),
     Literal(Literal),
     Sizeof(QualifiedType),
     Unary(Box<UnaryExpression>),
@@ -163,8 +194,8 @@ enum UnaryOperation {
     Sizeof,
     Cast(QualifiedType),
     ArrayAccess(Expression),
-    StructAccess(String),
-    StructDereference(String),
+    StructAccess(Identifier),
+    StructDereference(Identifier),
 }
 
 struct BinaryExpression {
@@ -299,16 +330,23 @@ struct CVQualifier {
 
 impl std::fmt::Display for CVQualifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let c = if self.constant { "const" } else { "" };
-        let v = if self.volatile { "volatile" } else { "" };
-        write!(f, "{c} {v}", c = c, v = v)
+        if self.constant {
+            f.write_str("const")?;
+        };
+        if self.constant && self.volatile {
+            f.write_str(" ")?;
+        }
+        if self.volatile {
+            f.write_str("volatile")?;
+        };
+        Ok(())
     }
 }
 
 enum UnqualifiedType {
-    Struct(String),
-    Union(String),
-    Identifier(String),
+    Struct(Identifier),
+    Union(Identifier),
+    Alias(Identifier),
     Pointer(Box<QualifiedType>),
     Array(Box<ArrayType>),
 }
@@ -342,22 +380,22 @@ enum StructType {
 
 struct Member {
     qualified_type: QualifiedType,
-    name: String,
+    name: Identifier,
     bitfield: Expression,
 }
 
 struct StructDeclaration {
-    name: Option<String>,
+    name: Option<Identifier>,
     members: Option<Vec<Member>>,
     struct_type: StructType,
 }
 
 struct Enumerator {
-    name: String,
+    name: Identifier,
     value: Option<Expression>,
 }
 
 struct EnumDeclaration {
-    name: String,
+    name: Identifier,
     enumerators: Vec<Enumerator>,
 }
