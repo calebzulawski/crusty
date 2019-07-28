@@ -1,9 +1,12 @@
-mod ast;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+mod declaration;
+mod expression;
+mod file;
+mod identifier;
+mod literal;
+mod r#type;
+pub use declaration::*;
+pub use expression::*;
+pub use file::*;
+pub use identifier::*;
+pub use literal::*;
+pub use r#type::*;

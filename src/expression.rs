@@ -1,126 +1,8 @@
-struct Body {
-    includes: Vec<Include>,
-    declarations: Vec<Declaration>,
-}
+use crate::identifier::Identifier;
+use crate::literal::Literal;
+use crate::r#type::QualifiedType;
 
-enum IncludeMethod {
-    Quote,
-    Bracket,
-}
-
-struct Include {
-    method: IncludeMethod,
-    path: String,
-}
-
-impl std::fmt::Display for Include {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (quote1, quote2) = match &self.method {
-            IncludeMethod::Quote => ("\"", "\""),
-            IncludeMethod::Bracket => ("<", ">"),
-        };
-        write!(
-            f,
-            "#include {quote1}{path}{quote2}",
-            path = self.path,
-            quote1 = quote1,
-            quote2 = quote2
-        )
-    }
-}
-
-struct Identifier {
-    name: String,
-}
-
-impl Identifier {
-    fn new(name: &str) -> Result<Self, String> {
-        if name.is_empty() {
-            return Err("identifier cannot be empty".to_string());
-        }
-        let first = name.chars().next().unwrap();
-        if !first.is_ascii_alphabetic() && (first != '_') {
-            return Err("identifier must begin with letter or '_'".to_string());
-        }
-        if !name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || (c == '_'))
-        {
-            return Err("identifiers can only contain alphanumerics or '_'".to_string());
-        }
-        Ok(Self {
-            name: name.to_string(),
-        })
-    }
-}
-
-impl std::fmt::Display for Identifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.name)
-    }
-}
-
-enum Literal {
-    Signed(i128),
-    SignedLong(i128),
-    SignedLongLong(i128),
-    Unsigned(u128),
-    UnsignedLong(u128),
-    UnsignedLongLong(u128),
-    Character(char),
-    WideCharacter(char),
-    Float(FloatConstant),
-    Double(FloatConstant),
-    LongDouble(FloatConstant),
-    String(String),
-    WideString(Vec<char>),
-}
-
-impl std::fmt::Display for Literal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Literal::Signed(val) => write!(f, "{}", val),
-            Literal::SignedLong(val) => write!(f, "{}L", val),
-            Literal::SignedLongLong(val) => write!(f, "{}LL", val),
-            Literal::Unsigned(val) => write!(f, "{}U", val),
-            Literal::UnsignedLong(val) => write!(f, "{}UL", val),
-            Literal::UnsignedLongLong(val) => write!(f, "{}ULL", val),
-            Literal::Character(val) => write!(f, "'{}'", val.escape_default()),
-            Literal::WideCharacter(val) => write!(f, "L'{}'", val.escape_default()),
-            Literal::Float(val) => write!(f, "{}f", val),
-            Literal::Double(val) => write!(f, "{}", val),
-            Literal::LongDouble(val) => write!(f, "{}L", val),
-            Literal::String(val) => write!(f, "\"{}\"", val.as_str().escape_default()),
-            Literal::WideString(val) => write!(
-                f,
-                "L\"{}\"",
-                val.iter()
-                    .map(|x| x.escape_default().to_string())
-                    .collect::<String>()
-            ),
-        }
-    }
-}
-
-struct FloatConstant {
-    integer: i128,
-    fraction: u128,
-    exponent: i128,
-}
-
-impl std::fmt::Display for FloatConstant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{integer}.{fraction}e{exponent}",
-            integer = self.integer,
-            fraction = self.fraction,
-            exponent = self.exponent
-        )
-    }
-}
-
-enum Expression {
+pub enum Expression {
     Identifier(Identifier),
     Literal(Literal),
     Sizeof(QualifiedType),
@@ -142,7 +24,7 @@ impl std::fmt::Display for Expression {
     }
 }
 
-struct UnaryExpression {
+pub struct UnaryExpression {
     expression: Expression,
     operation: UnaryOperation,
 }
@@ -198,7 +80,7 @@ enum UnaryOperation {
     StructDereference(Identifier),
 }
 
-struct BinaryExpression {
+pub struct BinaryExpression {
     left: Expression,
     right: Expression,
     operation: BinaryOperation,
@@ -281,7 +163,7 @@ enum BinaryOperation {
     BitwiseXorAssign,
 }
 
-struct TernaryExpression {
+pub struct TernaryExpression {
     condition: Expression,
     if_true: Expression,
     if_false: Expression,
@@ -297,105 +179,4 @@ impl std::fmt::Display for TernaryExpression {
             if_false = self.if_false
         )
     }
-}
-
-enum Storage {
-    Auto,
-    Static,
-    Register,
-    Extern,
-    Typedef,
-}
-
-impl std::fmt::Display for Storage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Storage::Auto => "auto",
-                Storage::Static => "static",
-                Storage::Register => "register",
-                Storage::Extern => "extern",
-                Storage::Typedef => "typedef",
-            }
-        )
-    }
-}
-
-struct CVQualifier {
-    constant: bool,
-    volatile: bool,
-}
-
-impl std::fmt::Display for CVQualifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.constant {
-            f.write_str("const")?;
-        };
-        if self.constant && self.volatile {
-            f.write_str(" ")?;
-        }
-        if self.volatile {
-            f.write_str("volatile")?;
-        };
-        Ok(())
-    }
-}
-
-enum UnqualifiedType {
-    Struct(Identifier),
-    Union(Identifier),
-    Alias(Identifier),
-    Pointer(Box<QualifiedType>),
-    Array(Box<ArrayType>),
-}
-
-struct ArrayType {
-    unqualified_type: UnqualifiedType,
-    size: Option<Expression>,
-}
-
-struct QualifiedType {
-    qualifier: CVQualifier,
-    unqualified_type: UnqualifiedType,
-}
-
-impl std::fmt::Display for QualifiedType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        unimplemented!()
-    }
-}
-
-struct Declaration {
-    storage: Option<Storage>,
-    qualifier: CVQualifier,
-    qualified_type: QualifiedType,
-}
-
-enum StructType {
-    Struct,
-    Union,
-}
-
-struct Member {
-    qualified_type: QualifiedType,
-    name: Identifier,
-    bitfield: Expression,
-}
-
-struct StructDeclaration {
-    name: Option<Identifier>,
-    members: Option<Vec<Member>>,
-    struct_type: StructType,
-}
-
-struct Enumerator {
-    name: Identifier,
-    value: Option<Expression>,
-}
-
-struct EnumDeclaration {
-    name: Identifier,
-    enumerators: Vec<Enumerator>,
 }
