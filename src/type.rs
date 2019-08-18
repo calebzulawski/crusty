@@ -111,27 +111,34 @@ impl Type {
         } else {
             Vec::new()
         };
+
+        // Keep track of which side of the identifier we're on, for the spiral rule
         let mut right = true;
         for modifier in &self.modifiers {
             match modifier {
                 TypeModifier::Pointer(qualifiers) => {
-                    if right && !v.is_empty() {
-                        v.insert(0, "(".to_string());
-                        v.push(")".to_string());
-                        right = false;
-                    }
+                    // Pointers don't need parens, so just move to the left
+                    right = false;
+
+                    // Print the cv-qualified pointer
                     if qualifiers.is_none() {
                         v.insert(0, "*".to_string());
                     } else {
                         v.insert(0, format!("* {}", qualifiers));
                     }
+                    if v.len() > 1 {
+                        v.insert(1, " ".to_string());
+                    }
                 }
                 TypeModifier::Function(args) => {
+                    // Push us back to the right if we're on the left
                     if !right && !v.is_empty() {
                         v.insert(0, "(".to_string());
                         v.push(")".to_string());
-                        right = true;
                     }
+                    right = true;
+
+                    // Print the function arguments
                     v.push("(".to_string());
                     v.extend(args.iter().enumerate().map(|(i, x)| {
                         if i > 0 {
@@ -143,11 +150,14 @@ impl Type {
                     v.push(")".to_string());
                 }
                 TypeModifier::Array(size) => {
+                    // Push us back to the right if we're on the left
                     if !right && !v.is_empty() {
                         v.insert(0, "(".to_string());
                         v.push(")".to_string());
-                        right = true;
                     }
+                    right = true;
+
+                    // Print the array and size
                     v.push("[".to_string());
                     if let Some(size) = size {
                         v.push(format!("{}", size))
@@ -156,10 +166,16 @@ impl Type {
                 }
             }
         }
-        if self.qualifiers.is_none() {
-            v.insert(0, format!("{} ", self.base));
-        } else {
-            v.insert(0, format!("{} {} ", self.qualifiers, self.base));
+        v.insert(
+            0,
+            if self.qualifiers.is_none() {
+                format!("{}", self.base)
+            } else {
+                format!("{} {}", self.qualifiers, self.base)
+            },
+        );
+        if v.len() > 1 {
+            v.insert(1, " ".to_string());
         }
         v.join("")
     }
@@ -317,7 +333,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn crazy_type() {
+    fn unnamed_type() {
         let t = TypeBuilder::new()
             .volatile()
             .pointer_to()
@@ -335,10 +351,23 @@ mod tests {
             .constant()
             .union_named("u")
             .unwrap();
-        println!("{:#?}", t);
         assert_eq!(
             format!("{}", t),
-            "const union u * volatile (* * volatile )(int, __m256i * const)"
+            "const union u * volatile (* * volatile)(int, __m256i * const)"
+        );
+    }
+
+    #[test]
+    fn named_type() {
+        let t = TypeBuilder::new()
+            .pointer_to()
+            .constant()
+            .pointer_to()
+            .function_returning(Vec::new())
+            .long_double();
+        assert_eq!(
+            t.to_string(Some(&Identifier::new("foo").unwrap())),
+            "long double (* const * foo)()"
         );
     }
 }
