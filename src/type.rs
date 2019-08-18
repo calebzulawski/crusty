@@ -49,6 +49,7 @@ enum BaseType {
     Union(Identifier),
     Enum(Identifier),
     Alias(Identifier),
+    Void,
     Char,
     SignedChar,
     UnsignedChar,
@@ -72,6 +73,7 @@ impl std::fmt::Display for BaseType {
             BaseType::Union(identifier) => write!(f, "union {}", identifier),
             BaseType::Enum(identifier) => write!(f, "enum {}", identifier),
             BaseType::Alias(identifier) => write!(f, "{}", identifier),
+            BaseType::Void => f.write_str("void"),
             BaseType::Char => f.write_str("char"),
             BaseType::SignedChar => f.write_str("signed char"),
             BaseType::UnsignedChar => f.write_str("unsigned char"),
@@ -219,6 +221,7 @@ macro_rules! functions {
         terminate_ident!(union_named, Union);
         terminate_ident!(enum_named, Enum);
         terminate_ident!(alias_named, Alias);
+        terminate!(void, Void);
         terminate!(char, Char);
         terminate!(unsigned_char, UnsignedChar);
         terminate!(signed_char, SignedChar);
