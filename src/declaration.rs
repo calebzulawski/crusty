@@ -12,23 +12,24 @@ pub enum Storage {
 
 impl std::fmt::Display for Storage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Storage::Auto => "auto",
-                Storage::Static => "static",
-                Storage::Register => "register",
-                Storage::Extern => "extern",
-                Storage::Typedef => "typedef",
-            }
-        )
+        f.write_str(match self {
+            Storage::Auto => "auto",
+            Storage::Static => "static",
+            Storage::Register => "register",
+            Storage::Extern => "extern",
+            Storage::Typedef => "typedef",
+        })
     }
 }
 
 pub struct Declaration {
     storage: Option<Storage>,
     qualified_type: QualifiedType,
+    declaration: DeclarationType,
+}
+
+enum DeclarationType {
+    Struct(StructDeclaration),
 }
 
 enum StructType {
@@ -39,7 +40,7 @@ enum StructType {
 struct Member {
     qualified_type: QualifiedType,
     name: Identifier,
-    bitfield: Expression,
+    width: Option<Expression>,
 }
 
 struct StructDeclaration {

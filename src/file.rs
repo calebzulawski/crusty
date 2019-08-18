@@ -33,7 +33,38 @@ pub struct Header {
     declarations: Vec<Declaration>,
 }
 
+impl std::fmt::Display for Header {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(guard) = self.guard {
+            writeln!(f, "#ifndef {}", guard)?;
+            writeln!(f, "#define {}", guard)?;
+        }
+        for include in self.includes {
+            writeln!(f, "{}", include)?;
+        }
+        for declaration in self.declarations {
+            writeln!(f, "{}", declaration)?;
+        }
+        if let Some(guard) = self.guard {
+            writeln!(f, "#endif // {}", guard)?;
+        }
+        Ok(())
+    }
+}
+
 pub struct TranslationUnit {
     includes: Vec<Include>,
     declarations: Vec<Declaration>,
+}
+
+impl std::fmt::Display for TranslationUnit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for include in self.includes {
+            writeln!(f, "{}", include)?;
+        }
+        for declaration in self.declarations {
+            writeln!(f, "{}", declaration)?;
+        }
+        Ok(())
+    }
 }

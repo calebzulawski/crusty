@@ -1,11 +1,12 @@
 use crate::identifier::Identifier;
 use crate::literal::Literal;
-use crate::r#type::QualifiedType;
+use crate::r#type::Type;
 
+#[derive(Debug)]
 pub enum Expression {
     Identifier(Identifier),
     Literal(Literal),
-    Sizeof(QualifiedType),
+    Sizeof(Type),
     Unary(Box<UnaryExpression>),
     Binary(Box<BinaryExpression>),
     Ternary(Box<TernaryExpression>),
@@ -24,6 +25,7 @@ impl std::fmt::Display for Expression {
     }
 }
 
+#[derive(Debug)]
 pub struct UnaryExpression {
     expression: Expression,
     operation: UnaryOperation,
@@ -62,6 +64,7 @@ impl std::fmt::Display for UnaryExpression {
     }
 }
 
+#[derive(Debug)]
 enum UnaryOperation {
     PrefixIncrement,
     PrefixDecrement,
@@ -74,12 +77,13 @@ enum UnaryOperation {
     BitwiseNegate,
     LogicalNegate,
     Sizeof,
-    Cast(QualifiedType),
+    Cast(Type),
     ArrayAccess(Expression),
     StructAccess(Identifier),
     StructDereference(Identifier),
 }
 
+#[derive(Debug)]
 pub struct BinaryExpression {
     left: Expression,
     right: Expression,
@@ -130,6 +134,7 @@ impl std::fmt::Display for BinaryExpression {
     }
 }
 
+#[derive(Debug)]
 enum BinaryOperation {
     Add,
     Subtract,
@@ -163,6 +168,7 @@ enum BinaryOperation {
     BitwiseXorAssign,
 }
 
+#[derive(Debug)]
 pub struct TernaryExpression {
     condition: Expression,
     if_true: Expression,

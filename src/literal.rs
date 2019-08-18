@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum Literal {
     Signed(i128),
     SignedLong(i128),
@@ -40,6 +41,7 @@ impl std::fmt::Display for Literal {
     }
 }
 
+#[derive(Debug)]
 pub struct FloatConstant {
     integer: i128,
     fraction: u128,
