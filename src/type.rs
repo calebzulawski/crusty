@@ -19,13 +19,6 @@ impl Qualifiers {
     fn is_none(&self) -> bool {
         !self.constant && !self.volatile
     }
-
-    fn set_const(&mut self, value: bool) {
-        self.constant = value;
-    }
-    fn set_volatile(&mut self, value: bool) {
-        self.volatile = value;
-    }
 }
 
 impl std::fmt::Display for Qualifiers {
@@ -319,7 +312,7 @@ impl QualifiedTypeBuilder {
     }
     functions!();
 
-    pub fn pointer_to(mut self) -> TypeBuilder {
+    pub fn pointer_to(self) -> TypeBuilder {
         let QualifiedTypeBuilder {
             mut modifiers,
             qualifiers,
