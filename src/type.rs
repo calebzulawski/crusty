@@ -340,7 +340,7 @@ macro_rules! implement_type_builder {
             qualifiers: qualifiers,
             modifiers: modifiers,
             name: None,
-            struct_type: StructType::Struct,
+            struct_type: StructType::Union,
             fields: Vec::new(),
         }
     }
@@ -498,7 +498,7 @@ pub struct StructDefinitionBuilder {
 }
 
 impl StructDefinitionBuilder {
-    fn finish(self) -> Type {
+    pub fn finish(self) -> Type {
         Type {
             base: BaseType::Struct {
                 name: self.name,
@@ -509,6 +509,47 @@ impl StructDefinitionBuilder {
             modifiers: self.modifiers,
         }
     }
+
+    pub fn named_field<S: Into<String>>(mut self, r#type: Type, name: S) -> Result<Self> {
+        self.fields.push(Field {
+            r#type: Box::new(r#type),
+            name: Some(Identifier::new(name.into())?),
+            width: None,
+        });
+        Ok(self)
+    }
+
+    pub fn anonymous_field(mut self, r#type: Type) -> Self {
+        self.fields.push(Field {
+            r#type: Box::new(r#type),
+            name: None,
+            width: None,
+        });
+        self
+    }
+
+    pub fn named_bit_field<S: Into<String>>(
+        mut self,
+        r#type: Type,
+        name: S,
+        width: Expression,
+    ) -> Result<Self> {
+        self.fields.push(Field {
+            r#type: Box::new(r#type),
+            name: Some(Identifier::new(name.into())?),
+            width: Some(Box::new(width)),
+        });
+        Ok(self)
+    }
+
+    pub fn anonymous_bit_field(mut self, r#type: Type, width: Expression) -> Self {
+        self.fields.push(Field {
+            r#type: Box::new(r#type),
+            name: None,
+            width: Some(Box::new(width)),
+        });
+        self
+    }
 }
 
 pub struct EnumBuilder {
@@ -517,11 +558,66 @@ pub struct EnumBuilder {
     name: Identifier,
 }
 
+impl EnumBuilder {
+    pub fn finish(self) -> Type {
+        Type {
+            base: BaseType::Enum {
+                name: Some(self.name),
+                enumerators: None,
+            },
+            qualifiers: self.qualifiers,
+            modifiers: self.modifiers,
+        }
+    }
+
+    pub fn with_enumerators(self) -> EnumDefinitionBuilder {
+        EnumDefinitionBuilder {
+            qualifiers: self.qualifiers,
+            modifiers: self.modifiers,
+            name: Some(self.name),
+            enumerators: Vec::new(),
+        }
+    }
+}
+
 pub struct EnumDefinitionBuilder {
     qualifiers: Qualifiers,
     modifiers: Vec<TypeModifier>,
     name: Option<Identifier>,
     enumerators: Vec<Enumerator>,
+}
+
+impl EnumDefinitionBuilder {
+    pub fn finish(self) -> Type {
+        Type {
+            base: BaseType::Enum {
+                name: self.name,
+                enumerators: Some(self.enumerators),
+            },
+            qualifiers: self.qualifiers,
+            modifiers: self.modifiers,
+        }
+    }
+
+    pub fn enumerator<S: Into<String>>(mut self, name: S) -> Result<Self> {
+        self.enumerators.push(Enumerator {
+            name: Identifier::new(name.into())?,
+            value: None,
+        });
+        Ok(self)
+    }
+
+    pub fn enumerator_with_value<S: Into<String>>(
+        mut self,
+        name: S,
+        value: Expression,
+    ) -> Result<Self> {
+        self.enumerators.push(Enumerator {
+            name: Identifier::new(name.into())?,
+            value: Some(Box::new(value)),
+        });
+        Ok(self)
+    }
 }
 
 #[cfg(test)]
@@ -567,5 +663,103 @@ mod tests {
             t.render(Some(&Identifier::new("foo").unwrap())),
             "long double (* const * foo)()"
         );
+    }
+
+    #[test]
+    fn empty_anon_enum() {
+        let t = TypeBuilder::new().anonymous_enum().finish();
+        assert_eq!(
+            t.render(Some(&Identifier::new("foo").unwrap())),
+            "enum { } foo"
+        );
+    }
+
+    #[test]
+    fn empty_anon_struct() {
+        let t = TypeBuilder::new().anonymous_struct().finish();
+        assert_eq!(
+            t.render(Some(&Identifier::new("foo").unwrap())),
+            "struct { } foo"
+        );
+    }
+
+    #[test]
+    fn empty_anon_union() {
+        let t = TypeBuilder::new().anonymous_union().finish();
+        assert_eq!(
+            t.render(Some(&Identifier::new("foo").unwrap())),
+            "union { } foo"
+        );
+    }
+
+    #[test]
+    fn empty_named_enum() {
+        let t = TypeBuilder::new()
+            .enum_named("foo")
+            .unwrap()
+            .with_enumerators()
+            .finish();
+        assert_eq!(
+            t.render(Some(&Identifier::new("bar").unwrap())),
+            "enum foo { } bar"
+        );
+    }
+
+    #[test]
+    fn empty_named_struct() {
+        let t = TypeBuilder::new()
+            .struct_named("foo")
+            .unwrap()
+            .with_fields()
+            .finish();
+        assert_eq!(
+            t.render(Some(&Identifier::new("bar").unwrap())),
+            "struct foo { } bar"
+        );
+    }
+
+    #[test]
+    fn empty_named_union() {
+        let t = TypeBuilder::new()
+            .union_named("foo")
+            .unwrap()
+            .with_fields()
+            .finish();
+        assert_eq!(
+            t.render(Some(&Identifier::new("bar").unwrap())),
+            "union foo { } bar"
+        );
+    }
+
+    #[test]
+    fn struct_fields() {
+        let t = TypeBuilder::new()
+            .anonymous_struct()
+            .anonymous_field(TypeBuilder::new().int())
+            .named_field(TypeBuilder::new().array_of().pointer_to().void(), "foo")
+            .unwrap()
+            .named_bit_field(
+                TypeBuilder::new().char(),
+                "bar",
+                Expression::Literal(crate::Literal::Signed(1)),
+            )
+            .unwrap()
+            .finish();
+        assert_eq!(
+            format!("{}", t),
+            "struct { int; void * foo[]; char bar : 1; }"
+        );
+    }
+
+    #[test]
+    fn enumerators() {
+        let t = TypeBuilder::new()
+            .anonymous_enum()
+            .enumerator("FOO")
+            .unwrap()
+            .enumerator_with_value("BAR", Expression::Literal(crate::Literal::Signed(1)))
+            .unwrap()
+            .finish();
+        assert_eq!(format!("{}", t), "enum { FOO, BAR = 1 }");
     }
 }
