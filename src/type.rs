@@ -3,6 +3,25 @@ use crate::expression::Expression;
 use crate::identifier::Identifier;
 
 #[derive(Debug)]
+enum StructType {
+    Struct,
+    Union,
+}
+
+#[derive(Debug)]
+struct Field {
+    r#type: Box<Type>,
+    name: Option<Identifier>,
+    width: Option<Box<Expression>>,
+}
+
+#[derive(Debug)]
+struct Enumerator {
+    name: Identifier,
+    value: Option<Box<Expression>>,
+}
+
+#[derive(Debug)]
 struct Qualifiers {
     constant: bool,
     volatile: bool,
@@ -38,9 +57,15 @@ impl std::fmt::Display for Qualifiers {
 
 #[derive(Debug)]
 enum BaseType {
-    Struct(Identifier),
-    Union(Identifier),
-    Enum(Identifier),
+    Struct {
+        name: Option<Identifier>,
+        struct_type: StructType,
+        fields: Option<Vec<Field>>,
+    },
+    Enum {
+        name: Option<Identifier>,
+        enumerators: Option<Vec<Enumerator>>,
+    },
     Alias(Identifier),
     Void,
     Char,
@@ -62,9 +87,30 @@ enum BaseType {
 impl std::fmt::Display for BaseType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BaseType::Struct(identifier) => write!(f, "struct {}", identifier),
-            BaseType::Union(identifier) => write!(f, "union {}", identifier),
-            BaseType::Enum(identifier) => write!(f, "enum {}", identifier),
+            BaseType::Struct {
+                name,
+                struct_type,
+                fields,
+            } => {
+                f.write_str(match struct_type {
+                    StructType::Struct => "struct",
+                    StructType::Union => "union",
+                })?;
+                if let Some(name) = name {
+                    write!(f, " {}", name)?;
+                }
+                if let Some(fields) = fields {
+                    unimplemented!(); // print fields
+                }
+                Ok(())
+            }
+            BaseType::Enum { name, enumerators } => {
+                f.write_str("enum")?;
+                if let Some(name) = name {
+                    write!(f, " {}", name)?;
+                }
+                unimplemented!(); // print enumerators
+            }
             BaseType::Alias(identifier) => write!(f, "{}", identifier),
             BaseType::Void => f.write_str("void"),
             BaseType::Char => f.write_str("char"),
@@ -184,8 +230,8 @@ impl std::fmt::Display for Type {
 
 macro_rules! terminate {
     ($func_name:ident, $base_type:ident) => {
-        pub fn $func_name(self) -> Type {
-            let (qualifiers, modifiers) = self.get_qualified_modifiers();
+        pub fn $func_name(self: Self) -> Type {
+            let (qualifiers, modifiers) = self.get_qualifiers_modifiers();
             Type {
                 base: BaseType::$base_type,
                 qualifiers: qualifiers,
@@ -195,41 +241,94 @@ macro_rules! terminate {
     };
 }
 
-macro_rules! terminate_ident {
-    ($func_name:ident, $base_type:ident) => {
-        pub fn $func_name<S: Into<String>>(self, name: S) -> Result<Type> {
-            let (qualifiers, modifiers) = self.get_qualified_modifiers();
-            Ok(Type {
-                base: BaseType::$base_type(Identifier::new(name.into())?),
-                qualifiers: qualifiers,
-                modifiers: modifiers,
-            })
-        }
-    };
-}
+macro_rules! implement_type_builder {
+    () => (
+    terminate!(void, Void);
+    terminate!(char, Char);
+    terminate!(unsigned_char, UnsignedChar);
+    terminate!(signed_char, SignedChar);
+    terminate!(short, Short);
+    terminate!(unsigned_short, UnsignedShort);
+    terminate!(int, Int);
+    terminate!(unsigned_int, UnsignedInt);
+    terminate!(long, Long);
+    terminate!(unsigned_long, UnsignedLong);
+    terminate!(long_long, LongLong);
+    terminate!(unsigned_long_long, UnsignedLongLong);
+    terminate!(float, Float);
+    terminate!(double, Double);
+    terminate!(long_double, LongDouble);
 
-macro_rules! functions {
-    () => {
-        terminate_ident!(struct_named, Struct);
-        terminate_ident!(union_named, Union);
-        terminate_ident!(enum_named, Enum);
-        terminate_ident!(alias_named, Alias);
-        terminate!(void, Void);
-        terminate!(char, Char);
-        terminate!(unsigned_char, UnsignedChar);
-        terminate!(signed_char, SignedChar);
-        terminate!(short, Short);
-        terminate!(unsigned_short, UnsignedShort);
-        terminate!(int, Int);
-        terminate!(unsigned_int, UnsignedInt);
-        terminate!(long, Long);
-        terminate!(unsigned_long, UnsignedLong);
-        terminate!(long_long, LongLong);
-        terminate!(unsigned_long_long, UnsignedLongLong);
-        terminate!(float, Float);
-        terminate!(double, Double);
-        terminate!(long_double, LongDouble);
-    };
+    pub fn alias_named<S: Into<String>>(self, name: S) -> Result<Type> {
+        let (qualifiers, modifiers) = self.get_qualifiers_modifiers();
+        Ok(Type {
+            base: BaseType::Alias(Identifier::new(name.into())?),
+            qualifiers: qualifiers,
+            modifiers: modifiers,
+        })
+    }
+
+    pub fn struct_named<S: Into<String>>(self, name: S) -> Result<StructBuilder> {
+        let (qualifiers, modifiers) = self.get_qualifiers_modifiers();
+        Ok(StructBuilder {
+            qualifiers: qualifiers,
+            modifiers: modifiers,
+            name: Identifier::new(name.into())?,
+            struct_type: StructType::Struct,
+        })
+    }
+
+    pub fn union_named<S: Into<String>>(self, name: S) -> Result<StructBuilder> {
+        let (qualifiers, modifiers) = self.get_qualifiers_modifiers();
+        Ok(StructBuilder {
+            qualifiers: qualifiers,
+            modifiers: modifiers,
+            name: Identifier::new(name.into())?,
+            struct_type: StructType::Union,
+        })
+    }
+
+    pub fn anonymous_struct(self) -> StructDefinitionBuilder {
+        let (qualifiers, modifiers) = self.get_qualifiers_modifiers();
+        StructDefinitionBuilder {
+            qualifiers: qualifiers,
+            modifiers: modifiers,
+            name: None,
+            struct_type: StructType::Struct,
+            fields: Vec::new(),
+        }
+    }
+
+    pub fn anonymous_union(self) -> StructDefinitionBuilder {
+        let (qualifiers, modifiers) = self.get_qualifiers_modifiers();
+        StructDefinitionBuilder {
+            qualifiers: qualifiers,
+            modifiers: modifiers,
+            name: None,
+            struct_type: StructType::Struct,
+            fields: Vec::new(),
+        }
+    }
+
+    pub fn enum_named<S: Into<String>>(self, name: S) -> Result<EnumBuilder> {
+        let (qualifiers, modifiers) = self.get_qualifiers_modifiers();
+        Ok(EnumBuilder {
+            qualifiers: qualifiers,
+            modifiers: modifiers,
+            name: Identifier::new(name.into())?,
+        })
+    }
+
+    pub fn anonymous_enum(self) -> EnumDefinitionBuilder {
+        let (qualifiers, modifiers) = self.get_qualifiers_modifiers();
+        EnumDefinitionBuilder {
+            qualifiers: qualifiers,
+            modifiers: modifiers,
+            name: None,
+            enumerators: Vec::new(),
+        }
+    }
+    )
 }
 
 pub struct TypeBuilder {
@@ -237,10 +336,10 @@ pub struct TypeBuilder {
 }
 
 impl TypeBuilder {
-    fn get_qualified_modifiers(self) -> (Qualifiers, Vec<TypeModifier>) {
+    fn get_qualifiers_modifiers(self) -> (Qualifiers, Vec<TypeModifier>) {
         (Qualifiers::none(), self.modifiers)
     }
-    functions!();
+    implement_type_builder!();
 
     pub fn new() -> Self {
         Self {
@@ -307,10 +406,10 @@ pub struct QualifiedTypeBuilder {
 }
 
 impl QualifiedTypeBuilder {
-    fn get_qualified_modifiers(self) -> (Qualifiers, Vec<TypeModifier>) {
+    fn get_qualifiers_modifiers(self) -> (Qualifiers, Vec<TypeModifier>) {
         (self.qualifiers, self.modifiers)
     }
-    functions!();
+    implement_type_builder!();
 
     pub fn pointer_to(self) -> TypeBuilder {
         let QualifiedTypeBuilder {
@@ -324,6 +423,72 @@ impl QualifiedTypeBuilder {
     }
 }
 
+pub struct StructBuilder {
+    qualifiers: Qualifiers,
+    modifiers: Vec<TypeModifier>,
+    name: Identifier,
+    struct_type: StructType,
+}
+
+impl StructBuilder {
+    fn finish(self) -> Type {
+        Type {
+            base: BaseType::Struct {
+                name: Some(self.name),
+                struct_type: self.struct_type,
+                fields: None,
+            },
+            qualifiers: self.qualifiers,
+            modifiers: self.modifiers,
+        }
+    }
+
+    fn with_fields(self) -> StructDefinitionBuilder {
+        StructDefinitionBuilder {
+            qualifiers: self.qualifiers,
+            modifiers: self.modifiers,
+            name: Some(self.name),
+            struct_type: self.struct_type,
+            fields: Vec::new(),
+        }
+    }
+}
+
+pub struct StructDefinitionBuilder {
+    qualifiers: Qualifiers,
+    modifiers: Vec<TypeModifier>,
+    name: Option<Identifier>,
+    struct_type: StructType,
+    fields: Vec<Field>,
+}
+
+impl StructDefinitionBuilder {
+    fn finish(self) -> Type {
+        Type {
+            base: BaseType::Struct {
+                name: self.name,
+                struct_type: self.struct_type,
+                fields: Some(self.fields),
+            },
+            qualifiers: self.qualifiers,
+            modifiers: self.modifiers,
+        }
+    }
+}
+
+pub struct EnumBuilder {
+    qualifiers: Qualifiers,
+    modifiers: Vec<TypeModifier>,
+    name: Identifier,
+}
+
+pub struct EnumDefinitionBuilder {
+    qualifiers: Qualifiers,
+    modifiers: Vec<TypeModifier>,
+    name: Option<Identifier>,
+    enumerators: Vec<Enumerator>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,6 +496,7 @@ mod tests {
     #[test]
     fn unnamed_type() {
         let t = TypeBuilder::new()
+            .sized_array_of(Expression::Literal(crate::Literal::Signed(5)))
             .volatile()
             .pointer_to()
             .pointer_to()
@@ -346,10 +512,11 @@ mod tests {
             .pointer_to()
             .constant()
             .union_named("u")
-            .unwrap();
+            .unwrap()
+            .finish();
         assert_eq!(
             format!("{}", t),
-            "const union u * volatile (* * volatile)(int, __m256i * const)"
+            "const union u * volatile (* * volatile [5])(int, __m256i * const)"
         );
     }
 

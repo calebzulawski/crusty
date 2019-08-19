@@ -43,19 +43,37 @@ impl std::fmt::Display for Literal {
 
 #[derive(Debug)]
 pub struct FloatConstant {
-    integer: i128,
-    fraction: u128,
-    exponent: i128,
+    value: String,
+}
+
+impl FloatConstant {
+    pub fn integer(integer: i128) -> Self {
+        Self {
+            value: integer.to_string(),
+        }
+    }
+
+    pub fn decimal(integer: i128, fraction: i128) -> Self {
+        Self {
+            value: format!("{}.{}", integer, fraction),
+        }
+    }
+
+    pub fn scientific(integer: i128, fraction: i128, exponent: i128) -> Self {
+        Self {
+            value: format!("{}.{}e{}", integer, fraction, exponent),
+        }
+    }
+
+    pub fn from_float(float: f64) -> Self {
+        Self {
+            value: format!("{:.}", float),
+        }
+    }
 }
 
 impl std::fmt::Display for FloatConstant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{integer}.{fraction}e{exponent}",
-            integer = self.integer,
-            fraction = self.fraction,
-            exponent = self.exponent
-        )
+        f.write_str(&self.value)
     }
 }
