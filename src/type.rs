@@ -15,10 +15,31 @@ struct Field {
     width: Option<Box<Expression>>,
 }
 
+impl std::fmt::Display for Field {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = self.r#type.render(self.name.as_ref());
+        if let Some(width) = &self.width {
+            write!(f, "{} : {};", s, width)
+        } else {
+            write!(f, "{};", s)
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Enumerator {
     name: Identifier,
     value: Option<Box<Expression>>,
+}
+
+impl std::fmt::Display for Enumerator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(value) = &self.value {
+            write!(f, "{} = {}", self.name, value)
+        } else {
+            write!(f, "{}", self.name)
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -100,7 +121,11 @@ impl std::fmt::Display for BaseType {
                     write!(f, " {}", name)?;
                 }
                 if let Some(fields) = fields {
-                    unimplemented!(); // print fields
+                    f.write_str(" {");
+                    for field in fields {
+                        write!(f, " {}", field)?;
+                    }
+                    f.write_str(" }");
                 }
                 Ok(())
             }
@@ -109,7 +134,17 @@ impl std::fmt::Display for BaseType {
                 if let Some(name) = name {
                     write!(f, " {}", name)?;
                 }
-                unimplemented!(); // print enumerators
+                if let Some(enumerators) = enumerators {
+                    f.write_str(" {");
+                    for (i, enumerator) in enumerators.iter().enumerate() {
+                        write!(f, " {}", enumerator)?;
+                        if i < enumerators.len() - 1 {
+                            f.write_str(",");
+                        }
+                    }
+                    f.write_str(" }");
+                }
+                Ok(())
             }
             BaseType::Alias(identifier) => write!(f, "{}", identifier),
             BaseType::Void => f.write_str("void"),
@@ -146,7 +181,7 @@ pub struct Type {
 }
 
 impl Type {
-    pub(crate) fn to_string(&self, name: Option<&Identifier>) -> String {
+    pub(crate) fn render(&self, name: Option<&Identifier>) -> String {
         let mut v = if let Some(name) = name {
             vec![format!("{}", name)]
         } else {
@@ -224,7 +259,7 @@ impl Type {
 
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.to_string(None))
+        f.write_str(&self.render(None))
     }
 }
 
@@ -529,7 +564,7 @@ mod tests {
             .function_returning(Vec::new())
             .long_double();
         assert_eq!(
-            t.to_string(Some(&Identifier::new("foo").unwrap())),
+            t.render(Some(&Identifier::new("foo").unwrap())),
             "long double (* const * foo)()"
         );
     }
